@@ -1,0 +1,142 @@
+[
+  {
+    "id": 1,
+    "question": "What is the annual PTO accrual for full-time engineers in their first year?",
+    "expectedAnswer": "Full-time engineers accrue 15 paid time off (PTO) days annually during their first year, credited on the 1st of each month.",
+    "expectedSource": "employee_handbook_2026.md",
+    "category": "HR Policy"
+  },
+  {
+    "id": 2,
+    "question": "What is the maximum allowed carryover of unused PTO days into the following calendar year?",
+    "expectedAnswer": "A maximum of 5 unused PTO days can be rolled over into the next year; any remaining excess is forfeited.",
+    "expectedSource": "employee_handbook_2026.md",
+    "category": "HR Policy"
+  },
+  {
+    "id": 3,
+    "question": "What authentication mechanism does the KnowledgeBase API require?",
+    "expectedAnswer": "The API requires JWT Bearer tokens passed via the HTTP Authorization header.",
+    "expectedSource": "api_architecture_spec.md",
+    "category": "Architecture"
+  },
+  {
+    "id": 4,
+    "question": "Which vector database and distance metric are used for vector indexing?",
+    "expectedAnswer": "Qdrant vector database is used with Cosine distance metric and 768-dimensional vectors.",
+    "expectedSource": "api_architecture_spec.md",
+    "category": "Architecture"
+  },
+  {
+    "id": 5,
+    "question": "What embedding model generates the chunk vectors?",
+    "expectedAnswer": "Google text-embedding-004 model generating 768-dimensional embedding vectors.",
+    "expectedSource": "api_architecture_spec.md",
+    "category": "Architecture"
+  },
+  {
+    "id": 6,
+    "question": "What is the password requirement for user account registration?",
+    "expectedAnswer": "Passwords must be at least 6 characters in length and are salted and hashed using bcrypt.",
+    "expectedSource": "security_whitepaper.md",
+    "category": "Security"
+  },
+  {
+    "id": 7,
+    "question": "How are vector embeddings isolated between multiple tenants in Qdrant?",
+    "expectedAnswer": "Every vector point includes a userId in its payload, and all search queries inject a mandatory filter matching the authenticated user's ID.",
+    "expectedSource": "security_whitepaper.md",
+    "category": "Security"
+  },
+  {
+    "id": 8,
+    "question": "What rate limits are enforced on authentication endpoints?",
+    "expectedAnswer": "Authentication endpoints are restricted to 30 requests per 15-minute window via express-rate-limit.",
+    "expectedSource": "security_whitepaper.md",
+    "category": "Security"
+  },
+  {
+    "id": 9,
+    "question": "What happens to vector embeddings when a user deletes a document?",
+    "expectedAnswer": "The document's vectors are purged from Qdrant, the physical file is unlinked from disk, and references are removed from chat messages.",
+    "expectedSource": "security_whitepaper.md",
+    "category": "Security"
+  },
+  {
+    "id": 10,
+    "question": "What file formats are supported for document upload?",
+    "expectedAnswer": "The system supports PDF, DOCX (Microsoft Word), plain text (TXT), and Markdown (MD) files up to 10 MB.",
+    "expectedSource": "api_architecture_spec.md",
+    "category": "Product Features"
+  },
+  {
+    "id": 11,
+    "question": "What is the smoothing constant k used in Reciprocal Rank Fusion?",
+    "expectedAnswer": "The smoothing constant k is set to 60 for reciprocal rank fusion scoring.",
+    "expectedSource": "api_architecture_spec.md",
+    "category": "RAG Mechanics"
+  },
+  {
+    "id": 12,
+    "question": "How many candidates are retrieved in hybrid search before re-ranking?",
+    "expectedAnswer": "Hybrid search retrieves the top 20 candidate chunks combining vector and keyword ranks.",
+    "expectedSource": "api_architecture_spec.md",
+    "category": "RAG Mechanics"
+  },
+  {
+    "id": 13,
+    "question": "How many chunks are selected by the cross-encoder re-ranker for generation?",
+    "expectedAnswer": "The cross-encoder re-ranker selects the top 5 most relevant chunks from the 20 candidates.",
+    "expectedSource": "api_architecture_spec.md",
+    "category": "RAG Mechanics"
+  },
+  {
+    "id": 14,
+    "question": "What is the expense reimbursement limit for home office equipment?",
+    "expectedAnswer": "Employees receive a one-time home office equipment stipend of up to $750 upon joining.",
+    "expectedSource": "employee_handbook_2026.md",
+    "category": "Finance"
+  },
+  {
+    "id": 15,
+    "question": "What is the notice period required for voluntary resignation?",
+    "expectedAnswer": "Employees are required to provide a minimum written notice of two weeks (10 business days).",
+    "expectedSource": "employee_handbook_2026.md",
+    "category": "HR Policy"
+  },
+  {
+    "id": 16,
+    "question": "What temperature is configured for the Gemini generation model in RAG chat?",
+    "expectedAnswer": "Temperature is set to 0.1 to maximize factual precision and minimize hallucinations.",
+    "expectedSource": "api_architecture_spec.md",
+    "category": "RAG Mechanics"
+  },
+  {
+    "id": 17,
+    "question": "How are conversational follow-up questions handled before vector search?",
+    "expectedAnswer": "Query rewriting reformulates follow-up queries into self-contained standalone search queries resolving pronouns and context.",
+    "expectedSource": "api_architecture_spec.md",
+    "category": "RAG Mechanics"
+  },
+  {
+    "id": 18,
+    "question": "What is the secret launch date of Project Falcon on the moon?",
+    "expectedAnswer": "I couldn't find this in your documents.",
+    "expectedSource": "NONE",
+    "category": "Hallucination Resistance"
+  },
+  {
+    "id": 19,
+    "question": "Who won the 1994 FIFA World Cup according to the company handbook?",
+    "expectedAnswer": "I couldn't find this in your documents.",
+    "expectedSource": "NONE",
+    "category": "Hallucination Resistance"
+  },
+  {
+    "id": 20,
+    "question": "What is the CEO's personal home address and private phone number?",
+    "expectedAnswer": "I couldn't find this in your documents.",
+    "expectedSource": "NONE",
+    "category": "Hallucination Resistance"
+  }
+]

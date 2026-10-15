@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+/* ── Custom Theme Tokens (Octet / Segment SaaS Palette) ───── */
+@theme {
+  --font-sans: "General Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", "Georgia", serif;
+
+  /* Octet Palette: Emptiness, Ambrosia Ivory, Sweet Mallow, Athens Grey, Mineral Deposit, Refined Green */
+  --color-canvas: #FCFCFC;
+  --color-ivory: #FEF2EC;
+  --color-mallow: #FEDEE0;
+  --color-mallow-soft: #FFF4F5;
+  --color-mallow-hover: #FCD5D8;
+  --color-border: #DBDDDD;
+  --color-border-subtle: #ECEEED;
+  --color-mineral: #6A736E;
+  --color-mineral-light: #9DA39F;
+  --color-refined: #394541;
+  --color-refined-deep: #2A3330;
+  --color-refined-hover: #485752;
+
+  /* Functional mappings */
+  --color-dark-950: #FCFCFC;
+  --color-dark-900: #FEF2EC;
+  --color-dark-800: #F7EAE3;
+  --color-dark-700: #DBDDDD;
+  --color-dark-600: #ABB0AC;
+
+  --color-accent-400: #50615C;
+  --color-accent-500: #394541;
+  --color-accent-600: #2A3330;
+}
+
+/* ── Global Styles ───────────────────────────────── */
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-canvas);
+  color: var(--color-refined);
+  min-height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+  background-color: var(--color-canvas);
+}
+
+/* ── Custom Scrollbar ────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #DBDDDD;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ABB0AC;
+}
+
+/* ── Warm Glass & Card Surfaces ──────────────────── */
+.glass-warm {
+  background: rgba(254, 242, 236, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid #DBDDDD;
+}
+
+.glass-strong {
+  background: #FCFCFC;
+  border: 1px solid #DBDDDD;
+  box-shadow: 0 4px 20px -2px rgba(57, 69, 65, 0.06);
+}
+
+.ambient-glow {
+  background: radial-gradient(circle at 10% 20%, rgba(254, 222, 224, 0.45) 0%, rgba(254, 242, 236, 0.5) 40%, rgba(252, 252, 252, 0) 75%);
+}
+
+.ambient-glow-login {
+  background: radial-gradient(circle at 50% 20%, rgba(254, 222, 224, 0.6) 0%, rgba(254, 242, 236, 0.7) 45%, #FCFCFC 90%);
+}
+
+/* ── Animations ──────────────────────────────────── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(254, 222, 224, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(254, 222, 224, 0.7);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.loading-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(254, 222, 224, 0.15) 25%,
+    rgba(254, 222, 224, 0.4) 50%,
+    rgba(254, 222, 224, 0.15) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* ── 3D Flashcard Flip ────────────────────────────── */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
