@@ -64,16 +64,9 @@ export function reciprocalRankFusion(rankings, k = 60) {
  */
 export async function hybridSearch(query, userId, topK = 20, documentId = null) {
   // 1. Vector Search
-  const queryVector = await embedText(query);
-  const vectorResultsPromise = searchSimilar(
-    queryVector,
-    topK,
-    userId,
-    documentId
-  ).catch((err) => {
-    console.warn("⚠️  Vector search error in hybrid:", err.message);
-    return [];
-  });
+  const vectorResultsPromise = embedText(query).then(vector =>
+    searchSimilar(vector, topK, userId, documentId)
+  );
 
   // 2. Keyword Search in MongoDB Text Index
   // Strip conversational/meta query words that distract sparse text search
@@ -109,17 +102,15 @@ export async function hybridSearch(query, userId, topK = 20, documentId = null) 
     })
       .sort({ score: { $meta: "textScore" } })
       .limit(topK)
-      .lean()
-      .catch((err) => {
-        console.warn("⚠️  Keyword search error in hybrid:", err.message);
-        return [];
-      });
+      .lean();
   }
 
-  const [vectorHits, keywordHits] = await Promise.all([
-    vectorResultsPromise,
-    keywordResultsPromise,
-  ]);
+  const [vectors, keywords] = await Promise.allSettled([vectorResultsPromise, keywordResultsPromise]);
+  if (vectors.status === "rejected" && (!cleanTerms || keywords.status === "rejected")) {
+    throw new Error("Document search is temporarily unavailable.");
+  }
+  const vectorHits = vectors.status === "fulfilled" ? vectors.value : [];
+  const keywordHits = keywords.status === "fulfilled" ? keywords.value : [];
 
   const normalizedVectorHits = (vectorHits || []).map((v) => ({
     documentId: v.payload.documentId,
@@ -145,33 +136,6 @@ export async function hybridSearch(query, userId, topK = 20, documentId = null) 
     [normalizedVectorHits, normalizedKeywordHits],
     60
   );
-
-  // If scoped to a specific document and search returned few candidates,
-  // backfill with sequential chunks from that document so coverage is complete
-  if (documentId && mergedResults.length < 5) {
-    const backfillChunks = await Chunk.find({ documentId, userId })
-      .sort({ chunkIndex: 1 })
-      .limit(topK)
-      .lean()
-      .catch(() => []);
-
-    for (const bf of backfillChunks) {
-      if (!mergedResults.some((r) => r.chunkIndex === bf.chunkIndex && String(r.documentId) === String(bf.documentId))) {
-        mergedResults.push({
-          key: `${bf.documentId}_${bf.chunkIndex}`,
-          documentId: String(bf.documentId),
-          filename: bf.filename,
-          page: bf.page || 1,
-          chunkIndex: bf.chunkIndex,
-          text: bf.text,
-          rrfScore: 0.01,
-          appearances: 1,
-          ranks: [99],
-          originalScore: 0,
-        });
-      }
-    }
-  }
 
   return mergedResults.slice(0, topK);
 }

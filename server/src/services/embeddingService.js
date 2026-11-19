@@ -5,42 +5,16 @@ const genAI = new GoogleGenerativeAI(config.geminiApiKey || "placeholder");
 const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
 
 /**
- * Deterministic 768-dimensional fallback embedding generator
- * Used if API key is invalid/rate-limited in local dev/testing
- */
-function fallbackEmbedding(text) {
-  const vec = new Array(768).fill(0);
-  const words = text.toLowerCase().split(/\W+/);
-  for (let i = 0; i < words.length; i++) {
-    const w = words[i];
-    let hash = 0;
-    for (let j = 0; j < w.length; j++) {
-      hash = (hash << 5) - hash + w.charCodeAt(j);
-      hash |= 0;
-    }
-    const idx = Math.abs(hash) % 768;
-    vec[idx] += 1;
-  }
-  const mag = Math.sqrt(vec.reduce((sum, val) => sum + val * val, 0)) || 1;
-  return vec.map((v) => v / mag);
-}
-
-/**
  * Embed a single text string.
  * @param {string} text
  * @returns {Promise<number[]>} 768-dimensional embedding vector
  */
 export async function embedText(text) {
-  try {
-    const result = await model.embedContent({
-      content: { parts: [{ text }] },
-      outputDimensionality: 768,
-    });
-    return result.embedding.values;
-  } catch (err) {
-    console.warn("⚠️  Gemini embedding error, using fallback embeddings:", err.message);
-    return fallbackEmbedding(text);
-  }
+  const result = await model.embedContent({
+    content: { parts: [{ text }] },
+    outputDimensionality: 768,
+  });
+  return result.embedding.values;
 }
 
 /**
@@ -72,7 +46,7 @@ export async function embedTexts(texts) {
 
     return allEmbeddings;
   } catch (err) {
-    console.warn("⚠️  Gemini batch embedding error, using fallback embeddings:", err.message);
-    return texts.map((t) => fallbackEmbedding(t));
+    console.warn("Embedding service unavailable. Indexing for keyword search only.");
+    return [];
   }
 }

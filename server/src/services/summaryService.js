@@ -10,13 +10,11 @@ const model = genAI.getGenerativeModel({
 /**
  * Fallback extractor for summary & tags if LLM is unavailable
  */
-function heuristicSummaryAndTags(text, filename) {
+function heuristicSummaryAndTags(text) {
   const clean = text.replace(/#+/g, "").replace(/\s+/g, " ").trim();
   const sentences = clean.split(/(?<=[.?!])\s+/).filter((s) => s.length > 20);
 
-  const summary =
-    sentences.slice(0, 3).join(" ") ||
-    `Document ${filename} contains structured notes and information for knowledge base reference.`;
+  const summary = sentences.slice(0, 3).join(" ") || clean;
 
   // Extract frequent capitalized or distinct words as tags
   const words = clean
@@ -33,11 +31,9 @@ function heuristicSummaryAndTags(text, filename) {
     .sort((a, b) => freq[b] - freq[a])
     .slice(0, 5);
 
-  const fallbackTags = sortedTags.length >= 3 ? sortedTags : ["Documentation", "Notes", "Knowledge", "Policy", "Reference"];
-
   return {
     summary,
-    tags: fallbackTags.slice(0, 5),
+    tags: sortedTags,
   };
 }
 
@@ -90,9 +86,9 @@ Return ONLY a valid JSON object with the following structure, with NO surroundin
     if (summary && tags.length > 0) {
       return { summary, tags };
     }
-    return heuristicSummaryAndTags(text, filename);
+    return heuristicSummaryAndTags(text);
   } catch (err) {
     console.warn("⚠️  LLM summary generation failed, using heuristic summary:", err.message);
-    return heuristicSummaryAndTags(text, filename);
+    return heuristicSummaryAndTags(text);
   }
 }

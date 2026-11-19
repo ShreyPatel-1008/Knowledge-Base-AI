@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { SendIcon } from "./Icons.jsx";
 
-export default function ChatBox({ onSend, disabled, placeholder }) {
+export default function ChatBox({ onSend, disabled, placeholder, documents, sourceId, onSourceChange }) {
   const [input, setInput] = useState("");
 
   const handleSubmit = (e) => {
@@ -13,7 +13,7 @@ export default function ChatBox({ onSend, disabled, placeholder }) {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (!e.nativeEvent.isComposing && e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
     }
@@ -22,8 +22,22 @@ export default function ChatBox({ onSend, disabled, placeholder }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="shrink-0 px-4 md:px-8 pb-6 pt-2 font-sans"
+      className="shrink-0 w-full max-w-4xl mx-auto px-4 md:px-8 pb-3 md:pb-6 pt-2 font-sans"
     >
+      <label className="mb-2 flex items-center gap-2 text-xs text-mineral">
+        Answer from
+        <select
+          className="min-w-0 max-w-[70%] truncate rounded-lg border border-border bg-canvas px-2 py-1 text-refined"
+          value={sourceId}
+          disabled={disabled}
+          onChange={event => onSourceChange(event.target.value)}
+        >
+          <option value="">All documents</option>
+          {documents.filter(doc => doc.status === "ready").map(doc =>
+            <option key={doc._id} value={doc._id}>{doc.filename}</option>
+          )}
+        </select>
+      </label>
       <div
         className={`
         flex items-end gap-3 bg-canvas border border-border rounded-2xl px-4 py-3
@@ -33,16 +47,18 @@ export default function ChatBox({ onSend, disabled, placeholder }) {
       `}
       >
         <textarea
+          aria-label="Your question"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={disabled}
-          placeholder={placeholder || "Ask a question about your documents…"}
+          placeholder={placeholder || "Ask a question about your documentsâ€¦"}
           rows={1}
           className="flex-1 bg-transparent text-sm text-refined placeholder-mineral resize-none outline-none max-h-32 leading-relaxed font-sans"
           style={{ fieldSizing: "content" }}
         />
         <button
+          aria-label="Send question"
           type="submit"
           disabled={disabled || !input.trim()}
           className={`
@@ -59,7 +75,7 @@ export default function ChatBox({ onSend, disabled, placeholder }) {
         </button>
       </div>
       <p className="text-[10px] text-mineral text-center mt-2">
-        Answers generated with Hybrid RRF retrieval + Cross-Encoder re-ranking. Press Enter to send.
+        Enter to send · Shift + Enter for a new line.
       </p>
     </form>
   );

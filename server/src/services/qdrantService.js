@@ -4,7 +4,8 @@ import config from "../config/index.js";
 
 const client = new QdrantClient({ url: config.qdrantUrl });
 const COLLECTION = config.qdrantCollection;
-const VECTOR_SIZE = 768; // text-embedding-004
+const VECTOR_SIZE = 768;
+const EMBEDDING_MODEL = "gemini-embedding-001";
 
 /**
  * Ensure collection exists with Cosine distance.
@@ -35,6 +36,8 @@ export async function ensureCollection() {
  * @returns {Promise<number>} Number of points upserted
  */
 export async function upsertChunks(chunks, embeddings, metadata) {
+  if (!embeddings.length) return 0;
+  if (embeddings.length !== chunks.length) throw new Error("Incomplete embedding batch.");
   await ensureCollection();
   const points = chunks.map((chunk, i) => {
     const estimatedPage =
@@ -50,6 +53,7 @@ export async function upsertChunks(chunks, embeddings, metadata) {
         documentId: String(metadata.documentId),
         filename: metadata.filename,
         chunkIndex: i,
+        embeddingModel: EMBEDDING_MODEL,
         page: estimatedPage,
         text: chunk,
         sourceType: metadata.sourceType || "file",
@@ -86,7 +90,7 @@ export async function searchSimilar(
       with_payload: true,
     };
 
-    const mustConditions = [];
+    const mustConditions = [{ key: "embeddingModel", match: { value: EMBEDDING_MODEL } }];
     if (userId) {
       mustConditions.push({
         key: "userId",

@@ -20,7 +20,7 @@ export async function streamChat(req, res, next) {
     const { question, chatId, documentId } = req.body;
     const userId = req.user._id;
 
-    if (!question || !question.trim()) {
+    if (typeof question !== "string" || !question.trim()) {
       return res.status(400).json({ success: false, message: "Question is required." });
     }
 
@@ -30,47 +30,24 @@ export async function streamChat(req, res, next) {
 
     if (scopedDocId) {
       const doc = await Document.findOne({ _id: scopedDocId, userId });
-      if (doc) scopedDocName = doc.filename;
+      if (!doc) return res.status(404).json({ success: false, message: "Document not found." });
+      if (doc.status !== "ready") return res.status(409).json({ success: false, message: "Document is not ready for chat." });
+      scopedDocName = doc.filename;
     } else {
-      // Auto-resolve if user question specifically references a document type or title
-      const qLower = question.toLowerCase();
-      const isVideoIntent = /\b(youtube|yt|video|transcript|clip)\b/i.test(qLower);
-      const isUrlIntent = /\b(url|link|webpage|web page|website)\b/i.test(qLower);
-
-      const userDocs = await Document.find({ userId, status: "ready" }).sort({ updatedAt: -1 }).lean();
-
-      if (isVideoIntent && userDocs.length > 0) {
-        const ytDocs = userDocs.filter((d) => d.type === "youtube" || /youtube|video/i.test(d.filename));
-        if (ytDocs.length > 0) {
-          // If query mentions part of a title, pick that one; otherwise prioritize the substantive tutorial/video
-          const matched = ytDocs.find((d) => {
-            const words = d.filename.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
-            return words.some((w) => qLower.includes(w));
-          });
-          // If not explicitly matched by title words, pick the longest/most substantial video or latest
-          const chosen = matched || (ytDocs.sort((a, b) => (b.chunkCount || 0) - (a.chunkCount || 0))[0]);
-          scopedDocId = chosen._id;
-          scopedDocName = chosen.filename;
-          console.log(`🎯  [Smart Routing] Auto-scoped query to YouTube document: "${scopedDocName}"`);
-        }
-      } else if (isUrlIntent && userDocs.length > 0) {
-        const urlDocs = userDocs.filter((d) => d.type === "web" || d.type === "url" || /http|www/i.test(d.filename));
-        if (urlDocs.length > 0) {
-          scopedDocId = urlDocs[0]._id;
-          scopedDocName = urlDocs[0].filename;
-          console.log(`🎯  [Smart Routing] Auto-scoped query to Web/URL document: "${scopedDocName}"`);
-        }
-      } else if (userDocs.length > 0) {
-        // Check if query directly references any document's title
-        const matched = userDocs.find((d) => {
-          const titleBase = d.filename.toLowerCase().replace(/\.[a-z0-9]+$/i, "");
-          return titleBase.length > 3 && qLower.includes(titleBase);
-        });
-        if (matched) {
-          scopedDocId = matched._id;
-          scopedDocName = matched.filename;
-          console.log(`🎯  [Smart Routing] Auto-scoped query to document: "${scopedDocName}"`);
-        }
+      const docs = await Document.find({ userId, status: "ready" }).select("filename type").lean();
+      const query = question.toLowerCase();
+      const named = docs.filter(({ filename }) => {
+        const title = filename.toLowerCase().replace(/\.[a-z0-9]+$/i, "");
+        return query.includes(filename.toLowerCase()) || (title.length > 3 && query.includes(title));
+      });
+      const video = /\b(youtube|video|transcript)\b/i.test(query);
+      const web = /\b(url|webpage|website)\b/i.test(query);
+      const matches = named.length ? named : docs.filter(doc =>
+        (video && doc.type === "youtube") || (web && doc.type === "web")
+      );
+      if (matches.length === 1) {
+        scopedDocId = matches[0]._id;
+        scopedDocName = matches[0].filename;
       }
     }
 
@@ -106,7 +83,8 @@ export async function streamChat(req, res, next) {
     const effectiveQuery = await rewriteQuery(question, recentMessages);
 
     // 5. Hybrid Search or Overview Timeline Sampling
-    const isOverviewIntent = /\b(explain|summarize|summary|overview|what is (this|the)|tell me about|walk me through|breakdown|whole|entire|all)\b/i.test(question);
+    const isOverviewIntent = /^(?:please\s+)?(?:summarize|explain|describe|give me (?:a summary|an overview) of)\s+(?:(?:all of|the whole|the entire|this|that|the)\s+)?(?:document|file|video|transcript|webpage|article|it)[.!?\s]*$/i.test(question.trim())
+      || /^(?:summary|overview|summarize)[.!?\s]*$/i.test(question.trim());
     let candidates = [];
 
     if (scopedDocId && isOverviewIntent) {
@@ -143,7 +121,8 @@ export async function streamChat(req, res, next) {
       }
     }
 
-    if (candidates.length === 0) {
+    const sampledOverview = candidates.length > 0;
+    if (!sampledOverview) {
       console.log(
         `🔎  [Hybrid Search] Query: "${effectiveQuery}" ${scopedDocName ? `[Scoped to ${scopedDocName}]` : ""}`
       );
@@ -156,7 +135,7 @@ export async function streamChat(req, res, next) {
     }
 
     // 6. Cross-Encoder Re-ranking: pick best 5 from top 20
-    const bestChunks = await rerankChunks(effectiveQuery, candidates, 5);
+    const bestChunks = sampledOverview ? candidates : await rerankChunks(effectiveQuery, candidates, 5);
 
     // Format sources
     const sources = (bestChunks || []).map((r) => ({
@@ -283,7 +262,7 @@ export async function streamChat(req, res, next) {
       res.write(
         `data: ${JSON.stringify({
           type: "error",
-          message: err.message || "An error occurred while generating the answer.",
+          message: "The answer could not be completed. Please try again.",
         })}\n\n`
       );
       res.end();

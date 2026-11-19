@@ -16,7 +16,6 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
  */
 export async function rerankChunks(question, candidates, topN = 5) {
   if (!candidates || candidates.length === 0) return [];
-  if (candidates.length <= topN) return candidates;
 
   const candidateSnippets = candidates
     .map((c, i) => `[Candidate ${i}]\n${c.text.slice(0, 450)}`)
@@ -50,10 +49,13 @@ ${candidateSnippets}
 
     const scoredMap = new Map();
     for (const item of scores) {
-      if (typeof item.index === "number" && typeof item.score === "number") {
-        scoredMap.set(item.index, item.score);
+      if (!Number.isInteger(item.index) || item.index < 0 || item.index >= candidates.length ||
+          !Number.isFinite(item.score) || item.score < 0 || item.score > 10 || scoredMap.has(item.index)) {
+        throw new Error("Invalid candidate score");
       }
+      scoredMap.set(item.index, item.score);
     }
+    if (scoredMap.size !== candidates.length) throw new Error("Incomplete candidate scores");
 
     // Attach rerank scores and sort
     const reranked = candidates.map((c, i) => {
@@ -69,9 +71,7 @@ ${candidateSnippets}
 
     // Keep top N, prioritizing items with score >= 3
     const relevant = reranked.filter((c) => c.rerankScore >= 3);
-    const finalSelection = (relevant.length > 0 ? relevant : reranked).slice(0, topN);
-
-    return finalSelection;
+    return relevant.slice(0, topN);
   } catch (err) {
     console.warn("⚠️  Re-ranking failed, falling back to RRF top candidates:", err.message);
     return candidates.slice(0, topN);

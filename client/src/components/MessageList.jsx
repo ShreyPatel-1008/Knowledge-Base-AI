@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { LogoIcon, FileTextIcon } from "./Icons.jsx";
 
 export default function MessageList({
+  hasReadyDocuments,
   messages,
   streamingMessage,
   isAsking,
@@ -22,16 +23,16 @@ export default function MessageList({
         <div className="w-16 h-16 rounded-3xl bg-ivory border border-border flex items-center justify-center mb-4 shadow-sm text-refined">
           <LogoIcon className="w-8 h-8 text-refined" />
         </div>
-        <h2 className="text-base font-display font-bold text-refined">Ask your Knowledge Base</h2>
+        <h2 className="text-3xl font-display font-bold text-refined">{hasReadyDocuments ? "Ask your documents" : "Build your document library"}</h2>
         <p className="text-xs text-mineral max-w-sm mt-1.5 leading-relaxed">
-          Upload PDF, Word (DOCX), Text, or Markdown files from the sidebar. Ask questions and get answers with exact source citations.
+          {hasReadyDocuments ? "Choose a source below or ask across your library." : "Upload a file or add a link in the document library to get started."}
         </p>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6">
+    <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-8 py-6 space-y-6 [&>*]:max-w-4xl [&>*]:mx-auto">
       {/* Historical & Completed messages */}
       {messages.map((msg, idx) => (
         <MessageBubble
@@ -82,7 +83,7 @@ function MessageBubble({ message, isStreaming, onSelectSource }) {
     return (
       <div className="flex justify-end animate-fade-in-up">
         <div className="max-w-[85%] md:max-w-[70%] bg-refined text-white rounded-2xl rounded-tr-xs px-4 py-3 shadow-xs">
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">{content}</p>
         </div>
       </div>
     );
@@ -93,7 +94,7 @@ function MessageBubble({ message, isStreaming, onSelectSource }) {
       <div className="w-8 h-8 shrink-0 rounded-xl bg-ivory border border-border flex items-center justify-center text-refined shadow-2xs">
         <LogoIcon className="w-4 h-4 text-refined" />
       </div>
-      <div className="max-w-[90%] md:max-w-[80%] space-y-3">
+      <div className="min-w-0 max-w-full md:max-w-[80%] [overflow-wrap:anywhere] space-y-3">
         {/* Message body */}
         <div className="bg-canvas border border-border rounded-2xl rounded-tl-xs px-5 py-4 text-sm text-refined leading-relaxed shadow-2xs">
           <div className="whitespace-pre-wrap font-sans">
@@ -108,7 +109,7 @@ function MessageBubble({ message, isStreaming, onSelectSource }) {
         {sources && sources.length > 0 && (
           <div className="space-y-1.5 pl-1">
             <span className="text-[10px] font-semibold text-mineral tracking-wider uppercase">
-              Citations ({sources.length}):
+              Retrieved passages ({sources.length})
             </span>
             <div className="flex flex-wrap gap-2">
               {sources.map((src, i) => (
@@ -119,10 +120,8 @@ function MessageBubble({ message, isStreaming, onSelectSource }) {
                 >
                   <FileTextIcon className="w-3.5 h-3.5 text-refined" />
                   <span className="font-medium max-w-[130px] truncate">{src.filename}</span>
-                  <span className="text-mineral">p.{src.page || 1}</span>
-                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-mallow text-refined font-bold border border-border">
-                    {Math.round((src.score || 0) * 100)}%
-                  </span>
+                  <span className="text-mineral">chunk #{src.chunkIndex}</span>
+
                 </button>
               ))}
             </div>
@@ -133,31 +132,68 @@ function MessageBubble({ message, isStreaming, onSelectSource }) {
   );
 }
 
-/**
- * Lightweight formatting for bold, lists, and code in markdown
- */
-function renderMarkdown(text) {
-  if (!text) return null;
-  const lines = text.split("\n");
-
-  return lines.map((line, idx) => {
-    // Bold parsing
-    const parts = line.split(/(\*\*[^*]+\*\*)/g);
-    const parsedLine = parts.map((part, i) => {
-      if (part.startsWith("**") && part.endsWith("**")) {
-        return (
-          <strong key={i} className="font-bold text-refined">
-            {part.slice(2, -2)}
-          </strong>
-        );
-      }
-      return part;
-    });
-
-    return (
-      <span key={idx} className="block min-h-[1.25rem]">
-        {parsedLine}
-      </span>
-    );
+function inlineText(text) {
+  return text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).map((part, i) => {
+    if (part.startsWith("`") && part.endsWith("`") && part.length > 1) {
+      return <code key={i}>{part.slice(1, -1)}</code>;
+    }
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
   });
+}
+
+function renderMarkdown(text) {
+  const blocks = [];
+  let bullets = [];
+  let code = null;
+
+  function flushBullets() {
+    if (!bullets.length) return;
+    blocks.push(<ul key={blocks.length} className="my-2 list-disc space-y-1 pl-5">{bullets}</ul>);
+    bullets = [];
+  }
+
+  function flushCode() {
+    blocks.push(<pre key={blocks.length} className="my-2 overflow-x-auto rounded bg-ivory p-3"><code>{code.join("\n")}</code></pre>);
+    code = null;
+  }
+
+  for (const raw of (text || "").split(/\r?\n/)) {
+    if (/^\s*```/.test(raw)) {
+      flushBullets();
+      if (code === null) code = [];
+      else flushCode();
+      continue;
+    }
+    if (code !== null) {
+      code.push(raw);
+      continue;
+    }
+    if (raw.trim() === "\\") continue;
+    // Some stored replies contain an escaped heading and several bullets on one line.
+    const normalized = raw.replace(/^\s*\\(#{1,6}\s)/, "$1")
+      .replace(/\\\*([ \t]+)(?=\*\*)/g, "\n* ")
+      .replace(/^\s*\\\*([ \t]+)/, "* ")
+      .replace(/&#x20;\s*$/i, "");
+    for (const line of normalized.split("\n")) {
+      const bullet = line.match(/^\s*[-*+]\s+(.+)$/);
+      if (bullet) {
+        bullets.push(<li key={bullets.length}>{inlineText(bullet[1])}</li>);
+        continue;
+      }
+      flushBullets();
+      const heading = line.match(/^(#{1,6})\s+(.+)$/);
+      if (heading) {
+        const Heading = "h" + heading[1].length;
+        blocks.push(<Heading key={blocks.length} className="mb-1 mt-3 font-semibold first:mt-0">{inlineText(heading[2])}</Heading>);
+      } else if (line.trim()) {
+        blocks.push(<p key={blocks.length} className="mb-1">{inlineText(line)}</p>);
+      }
+    }
+  }
+  flushBullets();
+  if (code !== null) flushCode();
+  return blocks;
 }

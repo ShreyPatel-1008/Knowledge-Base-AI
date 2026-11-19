@@ -22,9 +22,9 @@ const SYSTEM_PROMPT = `You are "KnowledgeBase AI", an ultra-precise enterprise k
    - Do not attempt to guess, extrapolate, or generate a plausible answer if the context does not state it.
 
 3. **INLINE CITATIONS**:
-   - Every factual statement, number, policy, or claim you make MUST include an inline citation citing the exact document and page/chunk:
-     Format: [Doc: <filename>, p. <page>]
-   - Example: "The total quarterly revenue was $14.2M [Doc: Q3_Report.pdf, p. 4]."
+   - Every factual statement, number, policy, or claim you make MUST include an inline citation citing the document and exact chunk index:
+     Format: [Doc: <filename>, chunk #<index>]
+   - Example: "The total quarterly revenue was $14.2M [Doc: Q3_Report.pdf, chunk #4]."
 
 4. **CONVERSATIONAL COHERENCE**:
    - Maintain natural dialogue based on recent chat history while strictly preserving factuality.
@@ -51,7 +51,6 @@ export async function streamChatWithContext(
       (chunk, i) =>
         `--- Context Chunk [${i + 1}] ---
 Document: "${chunk.filename}"
-Page: ${chunk.page || 1}
 Chunk Index: #${chunk.chunkIndex}
 Content:
 ${chunk.text}`
@@ -84,131 +83,10 @@ ${question}
 
 ## Your Answer:`;
 
-/**
- * Synthesizes a structured, highly informative response across all retrieved
- * context chunks when Gemini API is unavailable or offline.
- */
-function synthesizeContextualResponse(question, contextChunks, userMemories = []) {
-  if (!contextChunks || contextChunks.length === 0) {
-    return "I couldn't find this in your documents.";
-  }
-
-  const primaryDoc = contextChunks[0]?.filename || "Document";
-  const isVideo =
-    /video|youtube|school|remaster|foundation|course|part/i.test(primaryDoc) ||
-    contextChunks.some(
-      (c) =>
-        c.text &&
-        (/subscribe|channel|video|welcome|namaste|dosto/i.test(c.text) ||
-          c.text.includes("♪"))
-    );
-
-  const lines = [];
-
-  // 1. Header & Context Framing
-  if (isVideo) {
-    lines.push(`### 🎬 Overview: ${primaryDoc}`);
-  } else {
-    lines.push(`### 📄 Document Analysis: ${primaryDoc}`);
-  }
-  lines.push("");
-
-  // 2. Synthesize Intro / Executive Summary from early chunks
-  const firstChunk = contextChunks[0];
-  const firstSentences = (firstChunk.text || "")
-    .replace(/[\r\n]+/g, " ")
-    .split(/(?<=[.?!।])\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 20 && !/^(http|www|copyright)/i.test(s));
-
-  const summaryLead = firstSentences.slice(0, 2).join(" ");
-  if (summaryLead) {
-    lines.push(`**Executive Summary:** ${summaryLead} [Doc: ${firstChunk.filename}, p. ${firstChunk.page || 1}]`);
-    lines.push("");
-  }
-
-  // 3. Core Insights & Detailed Breakdown across ALL context chunks
-  lines.push("### 📌 Key Topics & Core Discussion");
-  lines.push("");
-
-  const seenInsights = new Set();
-  contextChunks.forEach((chunk, idx) => {
-    const raw = (chunk.text || "")
-      .replace(/[\r\n]+/g, ". ")
-      .split(/(?<=[.?!।])\s+/)
-      .map((s) => s.replace(/^[•\-\*\d\.\s]+/, "").trim())
-      .filter(
-        (s) =>
-          s.length >= 25 &&
-          s.length <= 260 &&
-          !/^(http|www|copyright|all rights)/i.test(s)
-      );
-
-    if (raw.length > 0) {
-      const selected = raw.find((s) => !seenInsights.has(s)) || raw[0];
-      if (selected && !seenInsights.has(selected)) {
-        seenInsights.add(selected);
-        const clean = selected.replace(/[^\w\s\u0900-\u097F]/g, "").trim();
-        const words = clean.split(/\s+/);
-        const tag = words.slice(0, Math.min(4, words.length)).join(" ");
-        lines.push(
-          `- **${tag || `Key Insight #${idx + 1}`}**: ${selected} [Doc: ${chunk.filename}, p. ${chunk.page || 1}]`
-        );
-      }
-    }
-  });
-
-  // 4. Practical Takeaways & Synthesis
-  lines.push("");
-  lines.push("### 💡 Core Takeaways & Implementation");
-  lines.push("");
-  if (isVideo) {
-    lines.push(
-      `- **Educational Focus**: The material provides a structured progression covering foundational theories, practical coding workflows, and real-world deployment patterns.`
-    );
-    lines.push(
-      `- **Reference Points**: Specific discussion milestones and implementation steps demonstrated in the session can be verified using the chunk citations above.`
-    );
-  } else {
-    lines.push(
-      `- **Compliance & Architecture**: The document establishes verified rules, operational procedures, and standards detailed in the cited sections above.`
-    );
-  }
-
-  // Incorporate memory preferences if present
-  if (userMemories && userMemories.length > 0) {
-    const prefSummary = userMemories
-      .map((m) => m.content)
-      .slice(0, 2)
-      .join("; ");
-    lines.push("");
-    lines.push(`*(Tailored to user preferences: ${prefSummary})*`);
-  }
-
-  return lines.join("\n");
-}
-
   try {
     const result = await model.generateContentStream(prompt);
     return result.stream;
-  } catch (err) {
-    console.warn("⚠️  Gemini API error or missing key. Using contextual synthesis engine:", err.message);
-
-    const synthesizedText = synthesizeContextualResponse(
-      question,
-      contextChunks,
-      userMemories
-    );
-
-    // Return simulated async generator stream
-    async function* fallbackStream() {
-      const words = synthesizedText.split(" ");
-      for (const word of words) {
-        yield { text: () => word + " " };
-        await new Promise((r) => setTimeout(r, 16));
-      }
-    }
-
-    return fallbackStream();
+  } catch {
+    throw new Error("Answer generation is unavailable. Please retry your question.");
   }
 }

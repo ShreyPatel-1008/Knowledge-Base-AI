@@ -242,7 +242,7 @@ function Dashboard() {
 
       while (true) {
         const { value, done } = await reader.read();
-        if (done) break;
+        if (done) throw new Error("The connection closed before the answer finished. Please try again.");
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n\n");
@@ -252,51 +252,49 @@ function Dashboard() {
           const trimmed = line.trim();
           if (!trimmed.startsWith("data: ")) continue;
 
-          try {
-            const payload = JSON.parse(trimmed.slice(6));
+          const payload = JSON.parse(trimmed.slice(6));
 
-            if (payload.type === "init") {
-              if (payload.chatId && !chat) {
-                setChat({ _id: payload.chatId });
-              }
-              currentSources = payload.sources || [];
-              setStreamingMessage({
-                content: "",
-                sources: currentSources,
-              });
-            } else if (payload.type === "token") {
-              currentContent += payload.token;
-              setStreamingMessage({
-                content: currentContent,
-                sources: currentSources,
-              });
-            } else if (payload.type === "done") {
-              setMessages((prev) => [
-                ...prev,
-                {
-                  _id: "msg-" + Date.now(),
-                  role: "assistant",
-                  content: payload.answer || currentContent,
-                  sources: payload.sources || currentSources,
-                  createdAt: new Date().toISOString(),
-                },
-              ]);
-              setStreamingMessage(null);
-            } else if (payload.type === "error") {
-              setMessages((prev) => [
-                ...prev,
-                {
-                  _id: "err-" + Date.now(),
-                  role: "assistant",
-                  content: `Error: ${payload.message || "An error occurred."}`,
-                  sources: [],
-                  createdAt: new Date().toISOString(),
-                },
-              ]);
-              setStreamingMessage(null);
+          if (payload.type === "init") {
+            if (payload.chatId && !chat) {
+              setChat({ _id: payload.chatId });
             }
-          } catch (e) {
-            console.error("Error parsing SSE chunk:", e);
+            currentSources = payload.sources || [];
+            setStreamingMessage({
+              content: "",
+              sources: currentSources,
+            });
+          } else if (payload.type === "token") {
+            currentContent += payload.token;
+            setStreamingMessage({
+              content: currentContent,
+              sources: currentSources,
+            });
+          } else if (payload.type === "done") {
+            setMessages((prev) => [
+              ...prev,
+              {
+                _id: "msg-" + Date.now(),
+                role: "assistant",
+                content: payload.answer || currentContent,
+                sources: payload.sources || currentSources,
+                createdAt: new Date().toISOString(),
+              },
+            ]);
+            setStreamingMessage(null);
+            return;
+          } else if (payload.type === "error") {
+            setMessages((prev) => [
+              ...prev,
+              {
+                _id: "err-" + Date.now(),
+                role: "assistant",
+                content: `Error: ${payload.message || "An error occurred."}`,
+                sources: [],
+                createdAt: new Date().toISOString(),
+              },
+            ]);
+            setStreamingMessage(null);
+            return;
           }
         }
       }
@@ -317,7 +315,7 @@ function Dashboard() {
   };
 
   return (
-    <div className="flex h-screen bg-canvas overflow-hidden font-sans text-refined ambient-glow">
+    <div className="flex h-dvh bg-canvas overflow-hidden font-sans text-refined ambient-glow">
       {/* ── Sidebar ── */}
       <Sidebar
         documents={documents}
@@ -337,12 +335,14 @@ function Dashboard() {
       />
 
       {/* ── Main Chat Dashboard ── */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-canvas/70">
+      <div className="min-w-0 flex-1 flex flex-col h-full overflow-hidden bg-canvas/70">
         {/* Header */}
         <header className="bg-canvas/95 border-b border-border backdrop-blur-md flex items-center justify-between px-4 md:px-6 py-3.5 shrink-0 z-10 shadow-xs">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setIsSidebarOpen((prev) => !prev)}
+              aria-label="Open document library"
+              aria-expanded={isSidebarOpen}
               className="md:hidden p-2 rounded-lg text-mineral hover:text-refined hover:bg-ivory cursor-pointer"
             >
               <MenuIcon className="w-5 h-5" />
@@ -359,8 +359,8 @@ function Dashboard() {
 
                 {/* Scoped Document Pill */}
                 {scopedDocument ? (
-                  <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-mallow border border-border text-refined flex items-center gap-1.5 animate-fade-in-up">
-                    <span>Scoped: <strong>{scopedDocument.name}</strong></span>
+                  <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-mallow border border-border text-refined flex min-w-0 max-w-full items-center gap-1.5 animate-fade-in-up">
+                    <span className="truncate" title={scopedDocument.name}>{scopedDocument.name}</span>
                     <button
                       onClick={() => setScopedDocument(null)}
                       title="Clear document scope and search all documents"
@@ -371,8 +371,9 @@ function Dashboard() {
                   </span>
                 ) : selectedTag ? (
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-mallow border border-border text-refined flex items-center gap-1">
-                    <span>#{selectedTag}</span>
+                    <span className="truncate">Library filter · #{selectedTag}</span>
                     <button
+                      aria-label="Clear library filter"
                       onClick={() => setSelectedTag(null)}
                       className="hover:opacity-70 cursor-pointer ml-0.5"
                     >
@@ -423,6 +424,8 @@ function Dashboard() {
 
             {/* Knowledge Graph Button */}
             <button
+              aria-label="Open knowledge graph"
+              disabled={isAsking}
               onClick={() => setIsGraphOpen(true)}
               className="px-3 py-1.5 rounded-lg bg-ivory hover:bg-mallow/60 border border-border text-xs font-medium text-refined transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
             >
@@ -442,6 +445,8 @@ function Dashboard() {
 
             {/* New Chat Button */}
             <button
+              aria-label="New chat"
+              disabled={isAsking}
               onClick={() => {
                 setChat(null);
                 setMessages([]);
@@ -457,6 +462,7 @@ function Dashboard() {
 
         {/* Message list */}
         <MessageList
+          hasReadyDocuments={documents.some(doc => doc.status === "ready")}
           messages={messages}
           streamingMessage={streamingMessage}
           isAsking={isAsking}
@@ -465,6 +471,12 @@ function Dashboard() {
 
         {/* Input area */}
         <ChatBox
+          documents={documents}
+          sourceId={scopedDocument?.id || ""}
+          onSourceChange={(id) => {
+            const doc = documents.find(item => item._id === id);
+            setScopedDocument(doc ? { id: doc._id, name: doc.filename } : null);
+          }}
           onSend={handleAsk}
           disabled={isAsking}
           placeholder={

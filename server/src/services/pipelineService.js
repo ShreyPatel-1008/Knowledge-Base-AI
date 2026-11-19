@@ -4,7 +4,7 @@ import { chunkText } from "./chunkingService.js";
 import { embedTexts } from "./embeddingService.js";
 import { generateSummaryAndTags } from "./summaryService.js";
 import { computeAverageEmbedding } from "../utils/mathUtils.js";
-import { ensureCollection, upsertChunks } from "./qdrantService.js";
+import { upsertChunks } from "./qdrantService.js";
 
 /**
  * Unified text chunk, embed, store, and summarization pipeline.
@@ -44,15 +44,16 @@ export async function processTextPipeline({
 
     // 2. Dense embeddings -> Qdrant vector database
     const embeddings = await embedTexts(chunks);
-    await ensureCollection();
-    await upsertChunks(chunks, embeddings, {
-      documentId: docId,
-      userId,
-      filename: sourceName,
-      pages,
-      sourceType,
-      sourceUrl,
-    });
+    if (embeddings.length) {
+      await upsertChunks(chunks, embeddings, {
+        documentId: docId,
+        userId,
+        filename: sourceName,
+        pages,
+        sourceType,
+        sourceUrl,
+      });
+    }
 
     // 3. Sparse full-text indexing -> MongoDB Chunk collection
     await Chunk.deleteMany({ documentId: docId });
